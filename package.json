@@ -2,7 +2,7 @@
   "name": "glomp",
   "version": "1.0.0",
   "description": "Lightweight, clearly-defined alternative to file glob strings",
-  "main": "dist/index.js",
+  "main": "index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "test": "vitest",
