@@ -1,0 +1,27 @@
+{
+  "include": ["./src/**/*.ts"],
+  "exclude": ["./**/*.test.ts", "./src/fixtures"],
+
+  "compilerOptions": {
+    "lib": ["es2019", "dom"],
+    "target": "es2018",
+    "module": "CommonJS",
+    "outDir": "./dist",
+
+    "strict": true,
+    "noImplicitAny": false,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "downlevelIteration": true,
+
+    "moduleResolution": "node",
+    "esModuleInterop": true
+  }
+}

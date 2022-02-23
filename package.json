@@ -1,0 +1,31 @@
+{
+  "name": "glomp",
+  "version": "1.0.0",
+  "description": "Lightweight, clearly-defined alternative to file glob strings",
+  "main": "index.js",
+  "types": "src/index.js",
+  "scripts": {
+    "test": "vitest"
+  },
+  "keywords": [
+    "glob",
+    "light",
+    "fast-glob",
+    "globby",
+    "globstar"
+  ],
+  "author": "Lily Scott <me@suchipi.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/suchipi/glomp.git"
+  },
+  "devDependencies": {
+    "@types/node": "^17.0.20",
+    "typescript": "^4.5.5",
+    "vitest": "^0.5.4"
+  },
+  "dependencies": {
+    "parallel-park": "^0.1.0"
+  }
+}
