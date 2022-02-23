@@ -50,7 +50,7 @@ const filePaths = await glomp(process.cwd())
 
 ## API Documentation
 
-Please see [api/index.d.ts](https://github.com/suchipi/glomp/blob/main/dist/index.d.ts) for API documentation. There are lots of comments.
+Please see [api/index.d.ts](https://github.com/suchipi/glomp/blob/main/api/index.d.ts) for API documentation. There are lots of comments.
 
 ## License
 
