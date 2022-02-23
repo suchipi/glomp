@@ -1,6 +1,6 @@
 {
   "name": "glomp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Lightweight, clearly-defined alternative to file glob strings",
   "main": "index.js",
   "types": "dist/index.d.ts",
