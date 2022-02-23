@@ -2,10 +2,11 @@
   "name": "glomp",
   "version": "1.0.0",
   "description": "Lightweight, clearly-defined alternative to file glob strings",
-  "main": "index.js",
-  "types": "src/index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "test": "vitest"
+    "test": "vitest",
+    "build": "tsc && cp dist/index.d.ts api/index.d.ts"
   },
   "keywords": [
     "glob",

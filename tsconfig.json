@@ -3,6 +3,7 @@
   "exclude": ["./**/*.test.ts", "./src/fixtures"],
 
   "compilerOptions": {
+    "declaration": true,
     "lib": ["es2019", "dom"],
     "target": "es2018",
     "module": "CommonJS",
