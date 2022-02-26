@@ -14,6 +14,7 @@ File globs like `./src/**/*.js` are great... until you get to know them.
 - Some libraries include files starting with a `.` in their results by default, but others don't
 - Some libraries automatically expand folder globs to end with `**/*`, and others don't.
   - For instance, in tsconfig, `src` means `src/**/*`, but in bash, `src` only means `src`.
+- It's not obvious how they compose together; does a file need to match _all_ of the globs in the list, or just one?
 
 If you work with glob strings a lot, this kind of stuff starts to bite you over and over, and it gets old. Despite their prevalence, glob strings are _far_ from standardized.
 
@@ -25,6 +26,7 @@ So, this library provides a way to find files on disk that match a particular pa
 
 - Easier to debug (just drop a console.log in the relevant match rule function)
 - Easier to understand (the library is very small, and its semantics are clearly-defined)
+- Composable (combine multiple patterns together using `.and`, `.andNot`, `.or`, and `.inverse`)
 
 Here's a taste of what it looks like:
 
@@ -41,11 +43,11 @@ const filePaths = await fastGlob([
 // You do this:
 import glomp from "glomp";
 
-const filePaths = await glomp(process.cwd())
+const filePaths = await glomp()
   .withExtension(".ts")
   .excludeExtension(".d.ts")
   .excludeDir("node_modules")
-  .findMatches();
+  .findMatches(process.cwd());
 ```
 
 ## API Documentation

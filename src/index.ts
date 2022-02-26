@@ -8,8 +8,23 @@ import { runJobs } from "parallel-park";
  * the specified `rootDir`. If `rootDir` isn't present, it defaults to
  * `process.cwd()`.
  */
-export default function glomp(rootDir: string = process.cwd()): Glomp {
-  return new Glomp(rootDir);
+export default function glomp(): Glomp {
+  return new Glomp();
+}
+
+function resolvePath(somePath: string, rootDir: string): string {
+  let resolvedPath = somePath;
+  if (!path.isAbsolute(somePath)) {
+    resolvedPath = path.resolve(rootDir, somePath);
+  }
+
+  return resolvedPath.replace(/\/$/, "");
+}
+
+function clone(someGlomp: Glomp) {
+  const newGlomp = new Glomp();
+  newGlomp.rules = someGlomp.rules.slice();
+  return newGlomp;
 }
 
 /**
@@ -20,118 +35,99 @@ export default function glomp(rootDir: string = process.cwd()): Glomp {
  * those filtering rules.
  */
 export class Glomp {
-  rules: Array<(absolutePath: string, isDir: boolean) => boolean> = [];
-  rootDir: string;
+  rules: Array<
+    (info: { rootDir: string; absolutePath: string; isDir: boolean }) => boolean
+  > = [];
 
   /**
-   * Create a new glomp instance that traverses and resolves paths relative to
-   * the specified `rootDir`.
-   */
-  constructor(rootDir: string) {
-    this.rootDir = rootDir;
-  }
-
-  /**
-   * A utility function that resolves `somePath` relative to this Glomp's
-   * rootDir, and strips a trailing slash off of the end of said path, if
-   * present.
-   *
-   * If `somePath` is absolute, it not be resolved relative to rootDir, but the
-   * trailing slash will still be stripped off.
-   */
-  resolvePath(somePath: string): string {
-    let resolvedPath = somePath;
-    if (!path.isAbsolute(somePath)) {
-      resolvedPath = path.resolve(this.rootDir, somePath);
-    }
-
-    return resolvedPath.replace(/\/$/, "");
-  }
-
-  /**
-   * Add a rule to this Glomp specifying that only files within
-   * the specified directory should be included in the results
-   * from `findMatches` or `findMatchesSync`.
+   * Return a new Glomp with all the rules of this Glomp plus a new rule
+   * specifying that only files within the specified directory should be
+   * included in the results from `findMatches` or `findMatchesSync`.
    *
    * If `someDir` isn't an absolute path, it will be resolved into
    * an absolute path by using the Glomp's rootDir property as
    * the directory to resolve from. If this isn't desired, pass
    * in an absolute path instead.
    */
-  withinDir(someDir: string): this {
-    const dir = this.resolvePath(someDir);
-    this.rules.push((absolutePath, _isDir) => {
-      return absolutePath.startsWith(dir);
+  withinDir(someDir: string): Glomp {
+    return this.customRule((info) => {
+      const dir = resolvePath(someDir, info.rootDir);
+      return info.absolutePath.startsWith(dir);
     });
-    return this;
   }
 
   /**
-   * Add a rule to this Glomp specifying that files within
-   * the specified directory should _NOT_ be included in the results
-   * from `findMatches` or `findMatchesSync`.
+   * Return a new Glomp with all the rules of this Glomp plus a new rule
+   * specifying that files within the specified directory should _NOT_ be
+   * included in the results from `findMatches` or `findMatchesSync`.
    *
    * If `someDir` isn't an absolute path, it will be resolved into
    * an absolute path by using the Glomp's rootDir property as
    * the directory to resolve from. If this isn't desired, pass
    * in an absolute path instead.
    */
-  excludeDir(someDir: string): this {
-    const dir = this.resolvePath(someDir);
-    this.rules.push((absolutePath, _isDir) => {
-      return !absolutePath.startsWith(dir);
+  excludeDir(someDir: string): Glomp {
+    return this.customRule((info) => {
+      const dir = resolvePath(someDir, info.rootDir);
+      return !info.absolutePath.startsWith(dir);
     });
-    return this;
   }
 
   /**
-   * Add a rule to this Glomp specifying that only files with the
-   * specified filetype extension should be included in the results
-   * from `findMatches` or `findMatchesSync`.
+   * Return a new Glomp with all the rules of this Glomp plus a new rule
+   * specifying that only files with the specified filetype extension should
+   * be included in the results from `findMatches` or `findMatchesSync`.
    */
-  withExtension(extension: string): this {
+  withExtension(extension: string): Glomp {
     let resolvedExtension = extension;
     if (!extension.startsWith(".")) {
       resolvedExtension = "." + resolvedExtension;
     }
 
-    this.rules.push((absolutePath, isDir) => {
-      if (isDir) return true;
-      return absolutePath.endsWith(extension);
+    return this.customRule((info) => {
+      if (info.isDir) return true;
+      return info.absolutePath.endsWith(extension);
     });
-    return this;
   }
 
   /**
-   * Add a rule to this Glomp specifying that files with the specified filetype
-   * extension should _NOT_ be included in the results from `findMatches` or
-   * `findMatchesSync`.
+   * Return a new Glomp with all the rules of this Glomp plus a new rule
+   * specifying that files with the specified filetype extension should _NOT_
+   * be included in the results from `findMatches` or `findMatchesSync`.
    */
-  excludeExtension(extension: string): this {
-    this.rules.push((absolutePath, _isDir) => {
-      return !absolutePath.endsWith(extension);
+  excludeExtension(extension: string): Glomp {
+    let resolvedExtension = extension;
+    if (!extension.startsWith(".")) {
+      resolvedExtension = "." + resolvedExtension;
+    }
+
+    return this.customRule((info) => {
+      if (info.isDir) return true;
+      return !info.absolutePath.endsWith(resolvedExtension);
     });
-    return this;
   }
 
   /**
-   * Add a rule to this Glomp specifying that only files which are
-   * **immediate children** of the specified directory should be included in
-   * the results from `findMatches` or `findMatchesSync`. This means that files
-   * that exist in subdirectories of the specified directotry will _NOT_ be
-   * included. If you want to include all files *including* those in
-   * subdirectories, use `withinDir` instead.
+   * Return a new Glomp with all the rules of this Glomp plus a new rule
+   * specifying that only files which are **immediate children** of the
+   * specified directory should be included in the results from `findMatches`
+   * or `findMatchesSync`.
+   *
+   * This means that files that exist in subdirectories of the specified
+   * directory will _NOT_ be included. If you want to include all files
+   * *including* those in subdirectories, use `withinDir` instead.
    *
    * If `someDir` isn't an absolute path, it will be resolved into
    * an absolute path by using the Glomp's rootDir property as
    * the directory to resolve from. If this isn't desired, pass
    * in an absolute path instead.
    */
-  immediateChildrenOfDir(someDir: string): this {
-    const dir = this.resolvePath(someDir);
-    this.rules.push((absolutePath, isDir) => {
-      if (isDir) {
-        if (dir.startsWith(absolutePath)) {
+  immediateChildrenOfDir(someDir: string): Glomp {
+    return this.customRule((info) => {
+      const dir = resolvePath(someDir, info.rootDir);
+
+      if (info.isDir) {
+        if (dir.startsWith(info.absolutePath)) {
           // Need to descend past here to find its children
           return true;
         } else {
@@ -139,50 +135,53 @@ export class Glomp {
         }
       }
 
-      return path.dirname(absolutePath) === dir;
+      return path.dirname(info.absolutePath) === dir;
     });
-    return this;
   }
 
   /**
-   * Add a rule to this Glomp specifying that files which are
-   * **immediate children** of the specified directory should _NOT_ be
-   * included in the results from `findMatches` or `findMatchesSync`. However,
-   * files that exist in subdirectories of the specified directory _will_ be
-   * included. If you want to exclude all of the contents of a directory,
-   * including files in subdirectories of that directory, use `excludeDir`
-   * instead.
+   * Return a new Glomp with all the rules of this Glomp plus a new rule
+   * specifying that files which are **immediate children** of the specified
+   * directory should _NOT_ be included in the results from `findMatches` or
+   * `findMatchesSync`. However, files that exist in subdirectories of the
+   * specified directory _will_ be included. If you want to exclude all of
+   * the contents of a directory, including files in subdirectories of that
+   * directory, use `excludeDir` instead.
    *
    * If `someDir` isn't an absolute path, it will be resolved into
    * an absolute path by using the Glomp's rootDir property as
    * the directory to resolve from. If this isn't desired, pass
    * in an absolute path instead.
    */
-  excludeImmediateChildrenOfDir(someDir: string): this {
-    const dir = this.resolvePath(someDir);
-    this.rules.push((absolutePath, isDir) => {
-      if (isDir) return true;
+  excludeImmediateChildrenOfDir(someDir: string): Glomp {
+    return this.customRule((info) => {
+      if (info.isDir) return true;
+      const dir = resolvePath(someDir, info.rootDir);
 
-      return path.dirname(absolutePath) !== dir;
+      return path.dirname(info.absolutePath) !== dir;
     });
-    return this;
   }
 
   /**
-   * Add a custom rule to this Glomp that determines whether paths should
-   * be included in the results from `findMatches` or `findMatchesSync`.
+   * Return a new Glomp with all the rules of this Glomp plus a new custom
+   * rule that determines whether paths should be included in the results from
+   * `findMatches` or `findMatchesSync`.
    *
    * Rules are functions with this signature:
    * ```ts
-   * function myRule(absolutePath: string, isDir: boolean): boolean;
+   * function myRule(info: {
+   *   absolutePath: string,
+   *   isDir: boolean,
+   *   rootDir: string
+   * }): boolean;
    * ```
    *
    * The rule function will be called repeatedly with absolute paths referring
    * to files and folders on disk, and should return either true or false.
    *
-   * When `isDir` is false, that means that Glomp is asking you:
+   * When `info.isDir` is false, that means that Glomp is asking you:
    *
-   * "`absolutePath` refers to a file. Should this file be included in the
+   * "`info.absolutePath` refers to a file. Should this file be included in the
    * results from `findMatches` or `findMatchesSync`?""
    *
    * - If the answer is no, return `false`, indicating that this file should
@@ -191,9 +190,9 @@ export class Glomp {
    * - If the answer is yes, return `true`, indicating that this file _should_
    *   be included in the output.
    *
-   * When `isDir` is true, that means that Glomp is asking you:
+   * When `info.isDir` is true, that means that Glomp is asking you:
    *
-   * "`absolutePath` refers to a directory. Could there be any files in this
+   * "`info.absolutePath` refers to a directory. Could there be any files in this
    * directory that should be included in the results from `findMatches` or
    * `findMatchesSync`?"
    *
@@ -204,19 +203,105 @@ export class Glomp {
    *   return `false`, indicating that there is no need to search through the
    *   contents of that firectory.
    *
+   * `info.rootDir` contains the absolute path to the root directory passed to
+   * `findMatches` or `findMatchesSync`.
+   *
    * Internally, all the rule-defining methods on a Glomp use the same
    * rule mechanism as `customRule`.
    */
-  customRule(rule: (absolutePath: string, isDir: boolean) => boolean) {
-    this.rules.push(rule);
-    return this;
+  customRule(
+    rule: (info: {
+      rootDir: string;
+      absolutePath: string;
+      isDir: boolean;
+    }) => boolean
+  ): Glomp {
+    const newGlomp = clone(this);
+    newGlomp.rules.push(rule);
+    return newGlomp;
   }
 
   /**
-   * Asynchronously scan through folders in the filesystem, finding files
+   * Create a new Glomp by combining the rules in this Glomp with the rules in
+   * another Glomp.
+   *
+   * The new Glomp will only match files that satisfy the rules in both Glomps.
+   *
+   * @param other The other Glomp to combine with.
+   */
+  and(other: Glomp): Glomp {
+    const newGlomp = clone(this);
+
+    newGlomp.rules.push(...other.rules);
+
+    return newGlomp;
+  }
+
+  /**
+   * Create a new Glomp by combining the rules in this Glomp with the rules in
+   * another Glomp.
+   *
+   * The new Glomp will only match files that satisfy the rules in this Glomp
+   * and DO NOT satisfy the rules in the other Glomp.
+   *
+   * This is the same as .and(other.inverse()), but using it makes your code
+   * easier to read, because the "inverse" part would otherwise be at the
+   * bottom of a long chain.
+   *
+   * @param other The other Glomp to combine with.
+   */
+  andNot(other: Glomp): Glomp {
+    return this.and(other.inverse());
+  }
+
+  /**
+   * Create a new Glomp by combining the rules in this Glomp with the rules in
+   * another Glomp.
+   *
+   * The new Glomp will match files that satisfy the rules in either this Glomp or the other one.
+   *
+   * @param other The other Glomp to combine with.
+   */
+  or(other: Glomp): Glomp {
+    const newGlomp = new Glomp();
+
+    newGlomp.rules.push((info) => {
+      const selfIsHappy = this.rules.every((rule) => rule(info));
+      if (selfIsHappy) return true;
+      const otherIsHappy = other.rules.every((rule) => rule(info));
+      return selfIsHappy || otherIsHappy;
+    });
+
+    return newGlomp;
+  }
+
+  /**
+   * Create a new Glomp by inverting all the rules in this glomp.
+   *
+   * The new Glomp will exclude files that this Glomp matches.
+   *
+   * @param other The other Glomp to combine with.
+   */
+  inverse() {
+    const newGlomp = clone(this);
+
+    newGlomp.rules = this.rules.map((rule) => {
+      return (info) => {
+        // We still want to be able to traverse into directories properly,
+        // so only invert the rule when we're talking about a file.
+        if (info.isDir) return true;
+        return !rule(info);
+      };
+    });
+
+    return newGlomp;
+  }
+
+  /**
+   * Asynchronously scan through the specified folder, finding files
    * that match the rules that have been defined on this Glomp instance.
    *
-   * To define rules on this Glomp instance, use any of these methods:
+   * To define rules, use any of these methods:
    * - `withinDir`
    * - `excludeDir`
    * - `withExtension`
@@ -246,17 +331,20 @@ export class Glomp {
    * The concurrency value defaults to the number of CPUs your system has
    * minus one.
    */
-  async findMatches({
-    concurrency = os.cpus().length - 1,
-  }: {
-    /**
-     * How many concurrent fs-scanning Promises are allowed at one time.
-     *
-     * Default to os.cpus().length - 1.
-     */
-    concurrency?: number;
-  } = {}): Promise<Array<string>> {
-    const searchPaths = [this.rootDir];
+  async findMatches(
+    rootDir: string,
+    {
+      concurrency = os.cpus().length - 1,
+    }: {
+      /**
+       * How many concurrent fs-scanning Promises are allowed at one time.
+       *
+       * Default to os.cpus().length - 1.
+       */
+      concurrency?: number;
+    } = {}
+  ): Promise<Array<string>> {
+    const searchPaths = [rootDir];
 
     const matches: Array<string> = [];
 
@@ -279,7 +367,11 @@ export class Glomp {
           if (childStats.isDirectory()) {
             let shouldTraverse = true;
             for (const rule of this.rules) {
-              shouldTraverse = rule(pathToChild, true);
+              shouldTraverse = rule({
+                absolutePath: pathToChild,
+                isDir: true,
+                rootDir,
+              });
               if (!shouldTraverse) break;
             }
 
@@ -289,7 +381,11 @@ export class Glomp {
           } else {
             let doesMatch = true;
             for (const rule of this.rules) {
-              doesMatch = rule(pathToChild, false);
+              doesMatch = rule({
+                absolutePath: pathToChild,
+                isDir: false,
+                rootDir,
+              });
               if (!doesMatch) break;
             }
             if (doesMatch) {
@@ -305,10 +401,10 @@ export class Glomp {
   }
 
   /**
-   * Synchronously scans through folders in the filesystem, finding files
+   * Synchronously scans through the specified folder, finding files
    * that match the rules that have been defined on this Glomp instance.
    *
-   * To define rules on this Glomp instance, use any of these methods:
+   * To define rules, use any of these methods:
    * - `withinDir`
    * - `excludeDir`
    * - `withExtension`
@@ -324,8 +420,8 @@ export class Glomp {
    * Note that ONLY PATHS TO FILES WILL BE RETURNED, _NOT_ PATHS TO
    * FOLDERS! This is an intentional design decision of `glomp`.
    */
-  findMatchesSync(): Array<string> {
-    const searchPaths = [this.rootDir];
+  findMatchesSync(rootDir: string): Array<string> {
+    const searchPaths = [rootDir];
 
     const matches: Array<string> = [];
 
@@ -347,7 +443,11 @@ export class Glomp {
         if (childStats.isDirectory()) {
           let shouldTraverse = true;
           for (const rule of this.rules) {
-            shouldTraverse = rule(pathToChild, true);
+            shouldTraverse = rule({
+              absolutePath: pathToChild,
+              isDir: true,
+              rootDir,
+            });
             if (!shouldTraverse) break;
           }
 
@@ -357,7 +457,11 @@ export class Glomp {
         } else {
           let doesMatch = true;
           for (const rule of this.rules) {
-            doesMatch = rule(pathToChild, false);
+            doesMatch = rule({
+              absolutePath: pathToChild,
+              isDir: false,
+              rootDir,
+            });
             if (!doesMatch) break;
           }
           if (doesMatch) {
