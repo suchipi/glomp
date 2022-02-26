@@ -282,7 +282,7 @@ export class Glomp {
    *
    * @param other The other Glomp to combine with.
    */
-  inverse() {
+  inverse(): Glomp {
     const newGlomp = clone(this);
 
     newGlomp.rules = this.rules.map((rule) => {
@@ -298,6 +298,29 @@ export class Glomp {
   }
 
   /**
+   * Return a new Glomp with all the rules of this Glomp plus a new rule
+   * specifying that the entire absolute path to a file must match the provided
+   * regular expression.
+   */
+  withAbsolutePathMatchingRegExp(regexp: RegExp): Glomp {
+    return this.customRule((info) => {
+      if (info.isDir) return true;
+      return regexp.test(info.absolutePath);
+    });
+  }
+
+  /**
+   * Return a new Glomp with all the rules of this Glomp plus a new rule
+   * specifying that filenames must match the provided regular expression.
+   */
+  withNameMatchingRegExp(regexp: RegExp): Glomp {
+    return this.customRule((info) => {
+      if (info.isDir) return true;
+      return regexp.test(path.basename(info.absolutePath));
+    });
+  }
+
+  /**
    * Asynchronously scan through the specified folder, finding files
    * that match the rules that have been defined on this Glomp instance.
    *
@@ -308,6 +331,8 @@ export class Glomp {
    * - `excludeExtension`
    * - `immediateChildrenOfDir`
    * - `excludeImmediateChildrenOfDir`
+   * - `withAbsolutePathMatchingRegExp`
+   * - `withNameMatchingRegExp`
    * - `customRule`
    *
    * After the relevant directories have all been searched, the Promise

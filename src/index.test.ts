@@ -382,3 +382,36 @@ test("or and inverse", async () => {
     ]
   `);
 });
+
+test("withAbsolutePathMatchingRegExp", async () => {
+  const g = glomp().withAbsolutePathMatchingRegExp(/dir-2/);
+
+  const results1 = await g.findMatches(fixturesDir);
+  const results2 = g.findMatchesSync(fixturesDir);
+
+  expect(results2).toEqual(results1);
+  expect(makeRelative(results1)).toMatchInlineSnapshot(`
+    [
+      "<fixtures>/dir-2/foof.txt",
+      "<fixtures>/dir-2/potato.d.ts",
+      "<fixtures>/dir-1/dir-b/dir-2/blah.txt",
+    ]
+  `);
+});
+
+test("withNameMatchingRegExp", async () => {
+  // dir- in the regexp here verifies that we're only matching
+  // against file name, not against the entire file path
+  const g = glomp().withNameMatchingRegExp(/dir-|fo/);
+
+  const results1 = await g.findMatches(fixturesDir);
+  const results2 = g.findMatchesSync(fixturesDir);
+
+  expect(results2).toEqual(results1);
+  expect(makeRelative(results1)).toMatchInlineSnapshot(`
+    [
+      "<fixtures>/dir-1/fox.ts",
+      "<fixtures>/dir-2/foof.txt",
+    ]
+  `);
+});
