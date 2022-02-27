@@ -1,10 +1,4 @@
 /**
- * Create a new glomp instance that traverses and resolves paths relative to
- * the specified `rootDir`. If `rootDir` isn't present, it defaults to
- * `process.cwd()`.
- */
-export default function glomp(): Glomp;
-/**
  * An object that traverses the filesystem looking for files that
  * match a user-defined set of rules. Use the methods on the `Glomp`
  * instance to add filtering rules, then run `findMatches` or
@@ -251,3 +245,8 @@ export declare class Glomp {
      */
     findMatchesSync(rootDir: string): Array<string>;
 }
+/**
+ * The default Glomp instance, from which all other Glomps can be created.
+ */
+declare const glomp: Glomp;
+export default glomp;

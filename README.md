@@ -43,7 +43,7 @@ const filePaths = await fastGlob([
 // You do this:
 import glomp from "glomp";
 
-const filePaths = await glomp()
+const filePaths = await glomp
   .withExtension(".ts")
   .excludeExtension(".d.ts")
   .excludeDir("node_modules")

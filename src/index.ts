@@ -3,15 +3,6 @@ import path from "path";
 import os from "os";
 import { runJobs } from "parallel-park";
 
-/**
- * Create a new glomp instance that traverses and resolves paths relative to
- * the specified `rootDir`. If `rootDir` isn't present, it defaults to
- * `process.cwd()`.
- */
-export default function glomp(): Glomp {
-  return new Glomp();
-}
-
 function resolvePath(somePath: string, rootDir: string): string {
   let resolvedPath = somePath;
   if (!path.isAbsolute(somePath)) {
@@ -369,6 +360,11 @@ export class Glomp {
       concurrency?: number;
     } = {}
   ): Promise<Array<string>> {
+    if (!path.isAbsolute(rootDir)) {
+      throw new Error(
+        "findMatches requires an absolute path, not a relative one."
+      );
+    }
     const searchPaths = [rootDir];
 
     const matches: Array<string> = [];
@@ -446,6 +442,11 @@ export class Glomp {
    * FOLDERS! This is an intentional design decision of `glomp`.
    */
   findMatchesSync(rootDir: string): Array<string> {
+    if (!path.isAbsolute(rootDir)) {
+      throw new Error(
+        "findMatchesSync requires an absolute path, not a relative one."
+      );
+    }
     const searchPaths = [rootDir];
 
     const matches: Array<string> = [];
@@ -499,3 +500,9 @@ export class Glomp {
     return matches;
   }
 }
+
+/**
+ * The default Glomp instance, from which all other Glomps can be created.
+ */
+const glomp = new Glomp();
+export default glomp;

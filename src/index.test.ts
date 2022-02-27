@@ -11,7 +11,7 @@ function makeRelative(paths: Array<string>) {
 }
 
 test("no rules", async () => {
-  const g = glomp();
+  const g = glomp;
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -31,7 +31,7 @@ test("no rules", async () => {
 });
 
 test("withinDir", async () => {
-  const g = glomp().withinDir("dir-1");
+  const g = glomp.withinDir("dir-1");
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -47,7 +47,7 @@ test("withinDir", async () => {
 });
 
 test("excludeDir", async () => {
-  const g = glomp().excludeDir("dir-1");
+  const g = glomp.excludeDir("dir-1");
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -64,7 +64,7 @@ test("excludeDir", async () => {
 });
 
 test("double excludeDir", async () => {
-  const g = glomp().excludeDir("dir-1").excludeDir("dir-2");
+  const g = glomp.excludeDir("dir-1").excludeDir("dir-2");
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -79,7 +79,7 @@ test("double excludeDir", async () => {
 });
 
 test("withExtension", async () => {
-  const g = glomp().withExtension(".txt");
+  const g = glomp.withExtension(".txt");
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -95,7 +95,7 @@ test("withExtension", async () => {
 });
 
 test("excludeExtension", async () => {
-  const g = glomp().excludeExtension(".txt");
+  const g = glomp.excludeExtension(".txt");
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -112,7 +112,7 @@ test("excludeExtension", async () => {
 });
 
 test("combining withExtension and excludeExtension", async () => {
-  const g = glomp().withExtension(".ts").excludeExtension(".d.ts");
+  const g = glomp.withExtension(".ts").excludeExtension(".d.ts");
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -126,7 +126,7 @@ test("combining withExtension and excludeExtension", async () => {
 });
 
 test("combining withExtension and excludeExtension (other way around)", async () => {
-  const g = glomp().excludeExtension(".d.ts").withExtension(".ts");
+  const g = glomp.excludeExtension(".d.ts").withExtension(".ts");
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -140,7 +140,7 @@ test("combining withExtension and excludeExtension (other way around)", async ()
 });
 
 test("immediateChildrenOfDir", async () => {
-  const g = glomp().immediateChildrenOfDir("dir-1");
+  const g = glomp.immediateChildrenOfDir("dir-1");
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -154,7 +154,7 @@ test("immediateChildrenOfDir", async () => {
 });
 
 test("immediateChildrenOfDir 2", async () => {
-  const g = glomp().immediateChildrenOfDir("dir-1/dir-b");
+  const g = glomp.immediateChildrenOfDir("dir-1/dir-b");
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -168,7 +168,7 @@ test("immediateChildrenOfDir 2", async () => {
 });
 
 test("excludeImmediateChildrenOfDir", async () => {
-  const g = glomp().excludeImmediateChildrenOfDir("dir-1");
+  const g = glomp.excludeImmediateChildrenOfDir("dir-1");
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -190,7 +190,7 @@ test("excludeImmediateChildrenOfDir", async () => {
 });
 
 test("excludeImmediateChildrenOfDir 2", async () => {
-  const g = glomp().excludeImmediateChildrenOfDir("dir-1/dir-b");
+  const g = glomp.excludeImmediateChildrenOfDir("dir-1/dir-b");
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -211,7 +211,7 @@ test("excludeImmediateChildrenOfDir 2", async () => {
 });
 
 test("customRule", async () => {
-  const g = glomp().customRule(({ absolutePath, isDir }) => {
+  const g = glomp.customRule(({ absolutePath, isDir }) => {
     if (isDir) return true;
 
     // Should match fixtures/dir-2 and fixtures/dir-1/dir-b/dir-2
@@ -232,7 +232,7 @@ test("customRule", async () => {
 });
 
 test("and", async () => {
-  const g = glomp().withinDir("dir-2").and(glomp().withExtension(".txt"));
+  const g = glomp.withinDir("dir-2").and(glomp.withExtension(".txt"));
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -246,7 +246,7 @@ test("and", async () => {
 });
 
 test("or", async () => {
-  const g = glomp().withinDir("dir-2").or(glomp().withExtension(".txt"));
+  const g = glomp.withinDir("dir-2").or(glomp.withExtension(".txt"));
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -263,7 +263,7 @@ test("or", async () => {
 });
 
 test("inverse", async () => {
-  const g = glomp().withExtension(".txt").inverse();
+  const g = glomp.withExtension(".txt").inverse();
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -280,7 +280,7 @@ test("inverse", async () => {
 });
 
 test("andNot", async () => {
-  const g = glomp().withinDir("dir-2").andNot(glomp().withExtension(".txt"));
+  const g = glomp.withinDir("dir-2").andNot(glomp.withExtension(".txt"));
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -294,7 +294,7 @@ test("andNot", async () => {
 });
 
 test("immediateChildrenOfDir and inverse", async () => {
-  const g = glomp().immediateChildrenOfDir("dir-1").inverse();
+  const g = glomp.immediateChildrenOfDir("dir-1").inverse();
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -313,7 +313,7 @@ test("immediateChildrenOfDir and inverse", async () => {
 });
 
 test("excludeImmediateChildrenOfDir and inverse", async () => {
-  const g = glomp().excludeImmediateChildrenOfDir("dir-1").inverse();
+  const g = glomp.excludeImmediateChildrenOfDir("dir-1").inverse();
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -330,7 +330,7 @@ test("excludeImmediateChildrenOfDir and inverse", async () => {
 });
 
 test("withExtension and inverse", async () => {
-  const g = glomp().withExtension(".ts").inverse();
+  const g = glomp.withExtension(".ts").inverse();
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -348,7 +348,7 @@ test("withExtension and inverse", async () => {
 });
 
 test("excludeExtension and inverse", async () => {
-  const g = glomp().excludeExtension(".ts").inverse();
+  const g = glomp.excludeExtension(".ts").inverse();
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -363,10 +363,7 @@ test("excludeExtension and inverse", async () => {
 });
 
 test("or and inverse", async () => {
-  const g = glomp()
-    .withExtension(".h")
-    .or(glomp().withExtension(".cfg"))
-    .inverse();
+  const g = glomp.withExtension(".h").or(glomp.withExtension(".cfg")).inverse();
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -384,7 +381,7 @@ test("or and inverse", async () => {
 });
 
 test("withAbsolutePathMatchingRegExp", async () => {
-  const g = glomp().withAbsolutePathMatchingRegExp(/dir-2/);
+  const g = glomp.withAbsolutePathMatchingRegExp(/dir-2/);
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
@@ -402,7 +399,7 @@ test("withAbsolutePathMatchingRegExp", async () => {
 test("withNameMatchingRegExp", async () => {
   // dir- in the regexp here verifies that we're only matching
   // against file name, not against the entire file path
-  const g = glomp().withNameMatchingRegExp(/dir-|fo/);
+  const g = glomp.withNameMatchingRegExp(/dir-|fo/);
 
   const results1 = await g.findMatches(fixturesDir);
   const results2 = g.findMatchesSync(fixturesDir);
