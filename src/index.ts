@@ -30,6 +30,8 @@ export class Glomp {
     (info: { rootDir: string; absolutePath: string; isDir: boolean }) => boolean
   > = [];
 
+  trace?: (message: string) => void;
+
   /**
    * Return a new Glomp with all the rules of this Glomp plus a new rule
    * specifying that only files within the specified directory should be
@@ -43,8 +45,15 @@ export class Glomp {
   withinDir(someDir: string): Glomp {
     return this.customRule((info) => {
       const dir = resolvePath(someDir, info.rootDir);
-      return info.absolutePath.startsWith(dir);
-    });
+
+      if (info.isDir) {
+        return (
+          dir.startsWith(info.absolutePath) || info.absolutePath.startsWith(dir)
+        );
+      } else {
+        return info.absolutePath.startsWith(dir);
+      }
+    }, `withinDir(${JSON.stringify(someDir)})`);
   }
 
   /**
@@ -61,7 +70,7 @@ export class Glomp {
     return this.customRule((info) => {
       const dir = resolvePath(someDir, info.rootDir);
       return !info.absolutePath.startsWith(dir);
-    });
+    }, `excludeDir(${JSON.stringify(someDir)})`);
   }
 
   /**
@@ -78,7 +87,7 @@ export class Glomp {
     return this.customRule((info) => {
       if (info.isDir) return true;
       return info.absolutePath.endsWith(extension);
-    });
+    }, `withExtension(${JSON.stringify(extension)})`);
   }
 
   /**
@@ -87,15 +96,7 @@ export class Glomp {
    * be included in the results from `findMatches` or `findMatchesSync`.
    */
   excludeExtension(extension: string): Glomp {
-    let resolvedExtension = extension;
-    if (!extension.startsWith(".")) {
-      resolvedExtension = "." + resolvedExtension;
-    }
-
-    return this.customRule((info) => {
-      if (info.isDir) return true;
-      return !info.absolutePath.endsWith(resolvedExtension);
-    });
+    return this.and(glomp.withExtension(extension).inverse());
   }
 
   /**
@@ -127,7 +128,7 @@ export class Glomp {
       }
 
       return path.dirname(info.absolutePath) === dir;
-    });
+    }, `immediateChildrenOfDir(${JSON.stringify(someDir)})`);
   }
 
   /**
@@ -150,7 +151,7 @@ export class Glomp {
       const dir = resolvePath(someDir, info.rootDir);
 
       return path.dirname(info.absolutePath) !== dir;
-    });
+    }, `excludeImmediateChildrenOfDir(${JSON.stringify(someDir)})`);
   }
 
   /**
@@ -205,10 +206,16 @@ export class Glomp {
       rootDir: string;
       absolutePath: string;
       isDir: boolean;
-    }) => boolean
+    }) => boolean,
+    name?: string
   ): Glomp {
     const newGlomp = clone(this);
+
+    Object.defineProperty(rule, "name", {
+      value: name || rule.name || "<anonymous>",
+    });
     newGlomp.rules.push(rule);
+
     return newGlomp;
   }
 
@@ -256,14 +263,12 @@ export class Glomp {
   or(other: Glomp): Glomp {
     const newGlomp = new Glomp();
 
-    newGlomp.rules.push((info) => {
+    return newGlomp.customRule((info) => {
       const selfIsHappy = this.rules.every((rule) => rule(info));
       if (selfIsHappy) return true;
       const otherIsHappy = other.rules.every((rule) => rule(info));
       return selfIsHappy || otherIsHappy;
-    });
-
-    return newGlomp;
+    }, `or(\n  ${this.rules.map((rule) => rule.name).join(", ")},\n  ${other.rules.map((rule) => rule.name).join(", ")}\n)`);
   }
 
   /**
@@ -277,12 +282,16 @@ export class Glomp {
     const newGlomp = clone(this);
 
     newGlomp.rules = this.rules.map((rule) => {
-      return (info) => {
+      const invertedRule = (info) => {
         // We still want to be able to traverse into directories properly,
         // so only invert the rule when we're talking about a file.
         if (info.isDir) return true;
         return !rule(info);
       };
+      Object.defineProperty(invertedRule, "name", {
+        value: "inversion of " + rule.name,
+      });
+      return invertedRule;
     });
 
     return newGlomp;
@@ -297,7 +306,7 @@ export class Glomp {
     return this.customRule((info) => {
       if (info.isDir) return true;
       return regexp.test(info.absolutePath);
-    });
+    }, `withAbsolutePathMatchingRegExp(${regexp.toString()})`);
   }
 
   /**
@@ -308,7 +317,7 @@ export class Glomp {
     return this.customRule((info) => {
       if (info.isDir) return true;
       return regexp.test(path.basename(info.absolutePath));
-    });
+    }, `withNameMatchingRegExp(${regexp.toString()})`);
   }
 
   /**
@@ -388,11 +397,21 @@ export class Glomp {
           if (childStats.isDirectory()) {
             let shouldTraverse = true;
             for (const rule of this.rules) {
-              shouldTraverse = rule({
+              const info = {
                 absolutePath: pathToChild,
                 isDir: true,
                 rootDir,
-              });
+              };
+              shouldTraverse = rule(info);
+              if (this.trace != null) {
+                this.trace(
+                  `${rule.name} with ${JSON.stringify(
+                    info,
+                    null,
+                    2
+                  )} -> ${shouldTraverse}`
+                );
+              }
               if (!shouldTraverse) break;
             }
 
@@ -402,11 +421,21 @@ export class Glomp {
           } else {
             let doesMatch = true;
             for (const rule of this.rules) {
-              doesMatch = rule({
+              const info = {
                 absolutePath: pathToChild,
                 isDir: false,
                 rootDir,
-              });
+              };
+              doesMatch = rule(info);
+              if (this.trace != null) {
+                this.trace(
+                  `${rule.name} with ${JSON.stringify(
+                    info,
+                    null,
+                    2
+                  )} -> ${doesMatch}`
+                );
+              }
               if (!doesMatch) break;
             }
             if (doesMatch) {
