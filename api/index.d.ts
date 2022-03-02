@@ -11,6 +11,7 @@ export declare class Glomp {
         absolutePath: string;
         isDir: boolean;
     }) => boolean>;
+    trace?: (message: string) => void;
     /**
      * Return a new Glomp with all the rules of this Glomp plus a new rule
      * specifying that only files within the specified directory should be
@@ -127,7 +128,7 @@ export declare class Glomp {
         rootDir: string;
         absolutePath: string;
         isDir: boolean;
-    }) => boolean): Glomp;
+    }) => boolean, name?: string): Glomp;
     /**
      * Create a new Glomp by combining the rules in this Glomp with the rules in
      * another Glomp.
