@@ -285,6 +285,8 @@ export class Glomp {
       const invertedRule = (info) => {
         // We still want to be able to traverse into directories properly,
         // so only invert the rule when we're talking about a file.
+        //
+        // TODO: this means inverted rules traverse down unnecessarily in some cases.
         if (info.isDir) return true;
         return !rule(info);
       };
