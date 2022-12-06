@@ -11,7 +11,7 @@ function makeRelative(paths: Array<string>) {
 }
 
 async function run(g: Glomp) {
-  const traces = [];
+  const traces: Array<string> = [];
   g.trace = (message) =>
     traces.push(message.replace(new RegExp(fixturesDir, "g"), "<fixtures>"));
 

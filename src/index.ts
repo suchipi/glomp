@@ -383,7 +383,13 @@ export class Glomp {
     await runJobs(
       searchPaths,
       async (dir) => {
-        const dirStats = await fs.promises.stat(dir);
+        let dirStats: fs.Stats;
+        try {
+          dirStats = await fs.promises.stat(dir);
+        } catch (err) {
+          // Ignore filesystem errors and keep going
+          return;
+        }
         const isDir = dirStats.isDirectory();
         if (!isDir) {
           throw new Error(
@@ -391,11 +397,23 @@ export class Glomp {
           );
         }
 
-        const children = await fs.promises.readdir(dir);
+        let children: Array<string>;
+        try {
+          children = await fs.promises.readdir(dir);
+        } catch (err) {
+          // Ignore filesystem errors and keep going
+          return;
+        }
         for (const child of children) {
           const pathToChild = path.join(dir, child);
 
-          const childStats = await fs.promises.stat(pathToChild);
+          let childStats: fs.Stats;
+          try {
+            childStats = await fs.promises.stat(pathToChild);
+          } catch (err) {
+            // Ignore filesystem errors and keep going
+            continue;
+          }
           if (childStats.isDirectory()) {
             let shouldTraverse = true;
             for (const rule of this.rules) {
@@ -484,7 +502,13 @@ export class Glomp {
 
     const searchPathsIterable = searchPaths[Symbol.iterator]();
     for (const dir of searchPathsIterable) {
-      const dirStats = fs.statSync(dir);
+      let dirStats: fs.Stats;
+      try {
+        dirStats = fs.statSync(dir);
+      } catch (err) {
+        // Ignore filesystem errors and keep going
+        continue;
+      }
       const isDir = dirStats.isDirectory();
       if (!isDir) {
         throw new Error(
@@ -492,11 +516,23 @@ export class Glomp {
         );
       }
 
-      const children = fs.readdirSync(dir);
+      let children: Array<string>;
+      try {
+        children = fs.readdirSync(dir);
+      } catch (err) {
+        // Ignore filesystem errors and keep going
+        continue;
+      }
       for (const child of children) {
         const pathToChild = path.join(dir, child);
 
-        const childStats = fs.statSync(pathToChild);
+        let childStats: fs.Stats;
+        try {
+          childStats = fs.statSync(pathToChild);
+        } catch (err) {
+          // Ignore filesystem errors and keep going
+          continue;
+        }
         if (childStats.isDirectory()) {
           let shouldTraverse = true;
           for (const rule of this.rules) {
