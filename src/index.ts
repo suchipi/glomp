@@ -12,30 +12,197 @@ function resolvePath(somePath: string, rootDir: string): string {
   return resolvedPath.replace(/\/$/, "");
 }
 
-function clone(someGlomp: Glomp) {
-  const newGlomp = new Glomp();
-  newGlomp.rules = someGlomp.rules.slice();
-  return newGlomp;
+export const TargetKind = (() => {
+  const File = 2 ** 0;
+  const Folder = 2 ** 1;
+  const DeadLink = 2 ** 2;
+  const LinkToFile = 2 ** 3;
+  const LinkToFolder = 2 ** 4;
+  const NonExistent = 2 ** 5;
+  const Unavailable = 2 ** 6;
+
+  const Any = File | Folder | DeadLink | LinkToFile | Folder;
+  const AnyFolder = Folder | LinkToFolder;
+  const AnyFile = File | DeadLink | LinkToFile | LinkToFolder;
+  const AnyLink = DeadLink | LinkToFile | LinkToFolder;
+
+  return {
+    File,
+    Folder,
+    DeadLink,
+    LinkToFile,
+    LinkToFolder,
+    NonExistent,
+    Unavailable,
+    Any,
+    AnyFolder,
+    AnyFile,
+    AnyLink,
+  };
+})();
+export type TargetKind = number;
+
+export type TraceFunction = (...args: Array<any>) => void;
+
+function getTargetKind(absPath: string, trace: TraceFunction): TargetKind {
+  try {
+    let stats = fs.statSync(absPath);
+
+    let wasLink = false;
+    if (stats.isSymbolicLink()) {
+      wasLink = true;
+      let currentPath;
+      try {
+        currentPath = fs.readlinkSync(absPath);
+      } catch (err: any) {
+        if (err.code === "ENOENT") {
+          return TargetKind.DeadLink;
+        } else {
+          if (trace != null) {
+            trace(
+              "Error occurred attempting to resolve symlink",
+              JSON.stringify(absPath),
+              err
+            );
+          }
+          return TargetKind.Unavailable;
+        }
+      }
+
+      for (let i = 0; i < 99; i++) {
+        stats = fs.statSync(currentPath);
+        if (stats.isSymbolicLink()) {
+          try {
+            currentPath = fs.readlinkSync(absPath);
+          } catch (err: any) {
+            if (err.code === "ENOENT") {
+              return TargetKind.DeadLink;
+            } else {
+              if (trace != null) {
+                trace(
+                  "Error occurred attempting to resolve symlink",
+                  JSON.stringify(absPath),
+                  err
+                );
+              }
+              return TargetKind.Unavailable;
+            }
+          }
+        } else {
+          break;
+        }
+      }
+
+      if (stats.isSymbolicLink() && trace != null) {
+        trace(
+          "Gave up resolving symlinks for path after reading 100 symlinks",
+          absPath
+        );
+      }
+    }
+
+    if (stats.isDirectory()) {
+      if (wasLink) {
+        return TargetKind.LinkToFolder;
+      } else {
+        return TargetKind.Folder;
+      }
+    } else {
+      if (wasLink) {
+        return TargetKind.LinkToFile;
+      } else {
+        return TargetKind.File;
+      }
+    }
+  } catch (err: any) {
+    if (err.code === "ENOENT") {
+      return TargetKind.NonExistent;
+    } else {
+      if (trace != null) {
+        trace(
+          "Error occurred attempting to stat path",
+          JSON.stringify(absPath),
+          err
+        );
+      }
+      return TargetKind.Unavailable;
+    }
+  }
+}
+
+export type GlompTarget = {
+  absolutePath: string;
+  relativePath: string;
+  kind: TargetKind;
+  rootDir: string;
+};
+
+export type GlompTraversalApi = {
+  stop(): void;
+};
+
+export type GlompRuleInit = {
+  targetMatcher: TargetKind;
+  beforeTraverse(
+    target: GlompTarget,
+    isNegated: boolean,
+    traversal: GlompTraversalApi
+  ): void;
+  doesTargetMatch(target: GlompTarget, isNegated: boolean): boolean;
+  name?: string;
+};
+
+export class GlompRule {
+  targetMatcher: TargetKind;
+  beforeTraverse: (
+    target: GlompTarget,
+    isNegated: boolean,
+    traversal: GlompTraversalApi
+  ) => void;
+  doesTargetMatch: (target: GlompTarget, isNegated: boolean) => boolean;
+  isNegated: boolean;
+  name?: string;
+
+  constructor(init: GlompRuleInit) {
+    this.targetMatcher = init.targetMatcher;
+    this.beforeTraverse = init.beforeTraverse;
+    this.doesTargetMatch = init.doesTargetMatch;
+
+    if (typeof init.name === "string") {
+      this.name = init.name;
+    }
+
+    this.isNegated = false;
+  }
+
+  makeNegatedVersion(): GlompRule {
+    const newRule = new GlompRule(this);
+    newRule.isNegated = true;
+    return newRule;
+  }
 }
 
 /**
- * An object that traverses the filesystem looking for files that
- * match a user-defined set of rules. Use the methods on the `Glomp`
+ * An object that traverses the filesystem looking for files or folders
+ * that match a user-defined set of rules. Use the methods on the `Glomp`
  * instance to add filtering rules, then run `findMatches` or
  * `findMatchesSync` to search the filesystem for files that match
  * those filtering rules.
  */
 export class Glomp {
-  rules: Array<
-    (info: { rootDir: string; absolutePath: string; isDir: boolean }) => boolean
-  > = [];
+  rules: Array<GlompRule> = [];
 
-  trace?: (message: string) => void;
+  constructor(rules: Array<GlompRule> = []) {
+    this.rules = rules;
+  }
+
+  /** You may set this property in order to log information about the traversal. */
+  trace?: TraceFunction;
 
   /**
    * Return a new Glomp with all the rules of this Glomp plus a new rule
-   * specifying that only files within the specified directory should be
-   * included in the results from `findMatches` or `findMatchesSync`.
+   * specifying that only files or folders within the specified directory
+   * should be included in the results from `findMatches` or `findMatchesSync`.
    *
    * If `someDir` isn't an absolute path, it will be resolved into
    * an absolute path by using the Glomp's rootDir property as
@@ -43,17 +210,20 @@ export class Glomp {
    * in an absolute path instead.
    */
   withinDir(someDir: string): Glomp {
-    return this.customRule((info) => {
-      const dir = resolvePath(someDir, info.rootDir);
+    const rule = new GlompRule({
+      name: `withinDir(${JSON.stringify(someDir)})`,
+      targetMatcher: TargetKind.Any,
+      beforeTraverse(target, isNegated, traversal) {
+        if (isNegated && target.relativePath.startsWith(someDir)) {
+          traversal.stop();
+        }
+      },
+      doesTargetMatch(target, isNegated) {
+        return target.relativePath.startsWith(someDir);
+      },
+    });
 
-      if (info.isDir) {
-        return (
-          dir.startsWith(info.absolutePath) || info.absolutePath.startsWith(dir)
-        );
-      } else {
-        return info.absolutePath.startsWith(dir);
-      }
-    }, `withinDir(${JSON.stringify(someDir)})`);
+    return this.defineRule(rule);
   }
 
   /**
@@ -67,7 +237,7 @@ export class Glomp {
    * in an absolute path instead.
    */
   excludeDir(someDir: string): Glomp {
-    return this.customRule((info) => {
+    return this.defineRule((info) => {
       const dir = resolvePath(someDir, info.rootDir);
       return !info.absolutePath.startsWith(dir);
     }, `excludeDir(${JSON.stringify(someDir)})`);
@@ -84,7 +254,7 @@ export class Glomp {
       resolvedExtension = "." + resolvedExtension;
     }
 
-    return this.customRule((info) => {
+    return this.defineRule((info) => {
       if (info.isDir) return true;
       return info.absolutePath.endsWith(extension);
     }, `withExtension(${JSON.stringify(extension)})`);
@@ -115,7 +285,7 @@ export class Glomp {
    * in an absolute path instead.
    */
   immediateChildrenOfDir(someDir: string): Glomp {
-    return this.customRule((info) => {
+    return this.defineRule((info) => {
       const dir = resolvePath(someDir, info.rootDir);
 
       if (info.isDir) {
@@ -146,7 +316,7 @@ export class Glomp {
    * in an absolute path instead.
    */
   excludeImmediateChildrenOfDir(someDir: string): Glomp {
-    return this.customRule((info) => {
+    return this.defineRule((info) => {
       if (info.isDir) return true;
       const dir = resolvePath(someDir, info.rootDir);
 
@@ -199,23 +369,11 @@ export class Glomp {
    * `findMatches` or `findMatchesSync`.
    *
    * Internally, all the rule-defining methods on a Glomp use the same
-   * rule mechanism as `customRule`.
+   * rule mechanism as `defineRule`.
    */
-  customRule(
-    rule: (info: {
-      rootDir: string;
-      absolutePath: string;
-      isDir: boolean;
-    }) => boolean,
-    name?: string
-  ): Glomp {
-    const newGlomp = clone(this);
-
-    Object.defineProperty(rule, "name", {
-      value: name || rule.name || "<anonymous>",
-    });
+  defineRule(rule: GlompRule): Glomp {
+    const newGlomp = new Glomp(this.rules);
     newGlomp.rules.push(rule);
-
     return newGlomp;
   }
 
@@ -228,10 +386,8 @@ export class Glomp {
    * @param other The other Glomp to combine with.
    */
   and(other: Glomp): Glomp {
-    const newGlomp = clone(this);
-
+    const newGlomp = new Glomp(this.rules);
     newGlomp.rules.push(...other.rules);
-
     return newGlomp;
   }
 
@@ -263,7 +419,7 @@ export class Glomp {
   or(other: Glomp): Glomp {
     const newGlomp = new Glomp();
 
-    return newGlomp.customRule((info) => {
+    return newGlomp.defineRule((info) => {
       const selfIsHappy = this.rules.every((rule) => rule(info));
       if (selfIsHappy) return true;
       const otherIsHappy = other.rules.every((rule) => rule(info));
@@ -279,21 +435,10 @@ export class Glomp {
    * @param other The other Glomp to combine with.
    */
   inverse(): Glomp {
-    const newGlomp = clone(this);
+    const newGlomp = new Glomp(this.rules);
 
     newGlomp.rules = this.rules.map((rule) => {
-      const invertedRule = (info) => {
-        // We still want to be able to traverse into directories properly,
-        // so only invert the rule when we're talking about a file.
-        //
-        // TODO: this means inverted rules traverse down unnecessarily in some cases.
-        if (info.isDir) return true;
-        return !rule(info);
-      };
-      Object.defineProperty(invertedRule, "name", {
-        value: "inversion of " + rule.name,
-      });
-      return invertedRule;
+      return rule.makeNegatedVersion();
     });
 
     return newGlomp;
@@ -305,7 +450,7 @@ export class Glomp {
    * regular expression.
    */
   withAbsolutePathMatchingRegExp(regexp: RegExp): Glomp {
-    return this.customRule((info) => {
+    return this.defineRule((info) => {
       if (info.isDir) return true;
       return regexp.test(info.absolutePath);
     }, `withAbsolutePathMatchingRegExp(${regexp.toString()})`);
@@ -316,7 +461,7 @@ export class Glomp {
    * specifying that filenames must match the provided regular expression.
    */
   withNameMatchingRegExp(regexp: RegExp): Glomp {
-    return this.customRule((info) => {
+    return this.defineRule((info) => {
       if (info.isDir) return true;
       return regexp.test(path.basename(info.absolutePath));
     }, `withNameMatchingRegExp(${regexp.toString()})`);
@@ -335,7 +480,7 @@ export class Glomp {
    * - `excludeImmediateChildrenOfDir`
    * - `withAbsolutePathMatchingRegExp`
    * - `withNameMatchingRegExp`
-   * - `customRule`
+   * - `defineRule`
    *
    * After the relevant directories have all been searched, the Promise
    * returned from this function will resolve to an Array of absolute path
@@ -463,7 +608,7 @@ export class Glomp {
    * - `excludeExtension`
    * - `immediateChildrenOfDir`
    * - `excludeImmediateChildrenOfDir`
-   * - `customRule`
+   * - `defineRule`
    *
    * After the relevant directories have all been searched, this function will
    * return an Array of absolute path strings to any located files that match
